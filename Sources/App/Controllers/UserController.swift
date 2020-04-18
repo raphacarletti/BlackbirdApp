@@ -7,8 +7,18 @@ final class UsersController {
         }
     }
 
-    func getAllHandler(_ req: Request) throws -> Future<[AppUser]> {
-        return AppUser.query(on: req).decode(AppUser.self).all()
+    func getAllHandler(_ req: Request) throws -> Future<[UserProfileResponse]> {
+        return try flatMap(req.parameters.next(AppUser.self), AppUser.query(on: req).decode(AppUser.self).all()) { currentUser, users in
+            var allUsers = users
+            if let index = try users.firstIndex(where: { try ($0.requireID() == currentUser.requireID())}) {
+                allUsers.remove(at: index)
+            }
+            var responses = [UserProfileResponse]()
+            for user in allUsers {
+                responses.append(try UserProfileResponse(user: user))
+            }
+            return Future.map(on: req) { responses }
+        }
     }
 
     func getOneHandler(_ req: Request) throws -> Future<[AppUser]> {
@@ -70,23 +80,36 @@ final class UsersController {
     }
 
     func profile(_ req: Request) throws -> Future<ProfileResponse> {
-        return try req.parameters.next(AppUser.self).flatMap({ user in
-            flatMap(try user.followings.query(on: req).count(), try user.followers.query(on: req).count(), try user.tweets.query(on: req).all()) { followingCount, followerCount, tweets in
-                var responses = [TweetResponse]()
-                for tweet in tweets {
-                    responses.append(try TweetResponse(tweet: tweet, user: user))
+        return flatMap(try req.parameters.next(AppUser.self), try req.parameters.next(AppUser.self)) { currentUser, userProfile in
+            let isCurrentUser = try (currentUser.requireID() == userProfile.requireID())
+            return flatMap(try userProfile.followings.query(on: req).count(), try userProfile.followers.query(on: req).count(), try userProfile.tweets.query(on: req).all()) { followingCount, followerCount, tweets in
+                if isCurrentUser {
+                    return Future.map(on: req) { return try self.profileResponse(user: userProfile, tweets: tweets, followingCount: followingCount, followerCount: followerCount, followUser: false, isCurrentUser: true) }
+                } else {
+                    return try currentUser.followings.query(on: req).filter(\UserFollowersPivot.followerId, .equal, try userProfile.requireID()).count().flatMap({ isFollowing in
+                        return Future.map(on: req) { return try self.profileResponse(user: userProfile, tweets: tweets, followingCount: followingCount, followerCount: followerCount, followUser: isFollowing == 1, isCurrentUser: false) }
+                    })
                 }
-                return Future.map(on: req) { return try ProfileResponse(user: user, followingCount: followingCount, followersCount: followerCount, tweets: responses) }
             }
-        })
+        }
+    }
+
+    private func profileResponse(user: AppUser, tweets: [Tweet], followingCount: Int, followerCount: Int, followUser: Bool, isCurrentUser: Bool) throws -> ProfileResponse {
+        var responses = [TweetResponse]()
+        for tweet in tweets {
+            responses.append(try TweetResponse(tweet: tweet, user: user))
+        }
+        return try ProfileResponse(user: user, followingCount: followingCount, followersCount: followerCount, tweets: responses, followUser: followUser, isCurrentUser: isCurrentUser)
     }
 }
 
 extension UsersController: RouteCollection {
     func boot(router: Router) throws {
-        let usersRoute = router.grouped("api", "users")
-        usersRoute.get(use: getAllHandler)
-        usersRoute.post(use: createHandler)
+        let getUsersRoute = router.grouped("api", "users", AppUser.parameter)
+        getUsersRoute.get(use: getAllHandler)
+
+        let createUsersRoute = router.grouped("api", "users")
+        createUsersRoute.post(use: createHandler)
 
         let singleUserRoute = router.grouped("api", "user")
         singleUserRoute.get(use: getOneHandler)
@@ -103,7 +126,7 @@ extension UsersController: RouteCollection {
         let followingListRoute = router.grouped("api", "following", AppUser.parameter)
         followingListRoute.get(use: followingList)
 
-        let profileRoute = router.grouped("api", "profile", AppUser.parameter)
+        let profileRoute = router.grouped("api", "profile", AppUser.parameter, AppUser.parameter)
         profileRoute.get(use: profile)
     }
 }

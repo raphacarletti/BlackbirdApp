@@ -1,16 +1,19 @@
 import Vapor
 
 final class AuthenticationController {
-    func authenticationHandler(req: Request) throws -> Future<SimpleResponse> {
+    func authenticationHandler(req: Request) throws -> Future<AuthenticationResponse> {
         return try req.content.decode(Authentication.self).flatMap { authentication in
-            let userCount = AppUser.query(on: req)
+            let user = AppUser.query(on: req)
                 .filter(\.username, .equal, authentication.username)
                 .filter(\.password, .equal, authentication.password)
-                .count()
+                .first()
 
-            return userCount.flatMap({ count -> EventLoopFuture<SimpleResponse> in
-                let success = count == 1
-                return req.response().future(SimpleResponse(success: success))
+            return user.flatMap({ userQuery -> EventLoopFuture<AuthenticationResponse> in
+                guard let userUnwrap = userQuery else {
+                    throw Abort(.notFound)
+                }
+                let userId = try userUnwrap.requireID().uuidString
+                return req.response().future(AuthenticationResponse(userId: userId))
             })
         }
     }

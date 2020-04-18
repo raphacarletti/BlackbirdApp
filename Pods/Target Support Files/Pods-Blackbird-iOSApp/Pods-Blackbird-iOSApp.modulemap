@@ -1,0 +1,6 @@
+framework module Pods_Blackbird_iOSApp {
+  umbrella header "Pods-Blackbird-iOSApp-umbrella.h"
+
+  export *
+  module * { export * }
+}

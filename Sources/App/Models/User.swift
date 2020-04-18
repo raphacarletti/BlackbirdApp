@@ -8,7 +8,7 @@ final class AppUser: Codable {
     var password: String
     var profileDescription: String
 
-    init(name: String, username: String, password: String, profileDescription: String) {
+    init(name: String, username: String, password: String, cc: String) {
         self.name = name
         self.username = username
         self.password = password

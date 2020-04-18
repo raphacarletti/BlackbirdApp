@@ -13,17 +13,32 @@ final class TweetController {
 
     func getFeed(_ req: Request) throws -> Future<[TweetResponse]> {
         return try req.parameters.next(AppUser.self).flatMap({ user in
-            try Tweet.query(on: req)
-                .join(\AppUser.id, to: \Tweet.userId)
-                .alsoDecode(AppUser.self)
-                .join(\UserFollowersPivot.followedId, to: \AppUser.id)
-                .filter(\UserFollowersPivot.followerId, .equal, user.requireID())
-                .all().flatMap { values in
-                var responses = [TweetResponse]()
-                for (tweet, user) in values {
-                    responses.append(try TweetResponse(tweet: tweet, user: user))
-                }
-                return Future.map(on: req) { return responses }
+            try flatMap(
+                user.tweets.query(on: req).all(),
+                Tweet.query(on: req)
+                    .join(\AppUser.id, to: \Tweet.userId)
+                    .alsoDecode(AppUser.self)
+                    .join(\UserFollowersPivot.followerId, to: \AppUser.id)
+                    .filter(\UserFollowersPivot.followedId, .equal, user.requireID())
+                    .all()) { myTweets, followingTweets in
+                        var responses = [TweetResponse]()
+                        for tweet in myTweets {
+                            responses.append(try TweetResponse(tweet: tweet, user: user))
+                        }
+                        for (tweet, user) in followingTweets {
+                            responses.append(try TweetResponse(tweet: tweet, user: user))
+                        }
+
+                        responses.sort { first, second in
+                            let firstTweetDate = Date(timeIntervalSince1970: first.timestamp)
+                            let secondTweetDate = Date(timeIntervalSince1970: second.timestamp)
+                            if firstTweetDate > secondTweetDate {
+                                return true
+                            }
+                            return false
+                        }
+
+                        return Future.map(on: req) { return responses }
             }
         })
     }

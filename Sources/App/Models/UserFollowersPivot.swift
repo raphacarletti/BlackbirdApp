@@ -18,8 +18,8 @@ final class UserFollowersPivot: PostgreSQLPivot, ModifiablePivot {
     }
 
     init(_ follower: AppUser, _ followed: AppUser) throws {
-        self.followerId = try follower.requireID()
-        self.followedId = try followed.requireID()
+        self.followedId = try follower.requireID()
+        self.followerId = try followed.requireID()
     }
 }
 

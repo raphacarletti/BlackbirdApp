@@ -1,0 +1,24 @@
+PODS:
+  - Alamofire (5.0.5)
+  - Cartography (4.0.0)
+  - JGProgressHUD (2.1)
+
+DEPENDENCIES:
+  - Alamofire
+  - Cartography
+  - JGProgressHUD
+
+SPEC REPOS:
+  trunk:
+    - Alamofire
+    - Cartography
+    - JGProgressHUD
+
+SPEC CHECKSUMS:
+  Alamofire: df2f8f826963b08b9a870791ad48e07a10090b2e
+  Cartography: c5626d29056b20f1e95c017326ee4df57cc39ad8
+  JGProgressHUD: aa403e9a5b45cae98903c4600cccdd98c0c3ec90
+
+PODFILE CHECKSUM: bf9549c7a180f8cae3ff28e74356a7f7343e3c14
+
+COCOAPODS: 1.9.1
